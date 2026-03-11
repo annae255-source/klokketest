@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Klokketest</title>
+  <style>
+    :root { font-family: Arial, sans-serif; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      width: min(92vw, 420px);
+      text-align: center;
+    }
+    h1 { margin-top: 0; font-size: 1.4rem; }
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+      font-size: 1rem;
+    }
+    button {
+      background: black;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    .hidden { display: none; }
+    .timer { font-size: 1.2rem; margin: 14px 0; }
+    .progress { margin: 10px 0; color: #444; }
+    .clock {
+      width: 220px;
+      height: 220px;
+      border: 8px solid #222;
+      border-radius: 50%;
+      margin: 18px auto;
+      position: relative;
+      background: white;
+    }
+    .center {
+      width: 12px;
+      height: 12px;
+      background: #222;
+      border-radius: 50%;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+    }
+    .hand {
+      position: absolute;
+      left: 50%;
+      bottom: 50%;
+      transform-origin: bottom center;
+      transform: translateX(-50%) rotate(0deg);
+      border-radius: 8px;
+    }
+    .hour {
+      width: 6px;
+      height: 58px;
+      background: #222;
+    }
+    .minute {
+      width: 4px;
+      height: 82px;
+      background: #444;
+    }
+    .tick {
+      position: absolute;
+      width: 4px;
+      height: 14px;
+      background: #222;
+      top: 6px;
+      left: 50%;
+      transform-origin: 50% 104px;
+      margin-left: -2px;
+    }
+    .msg { margin-top: 12px; font-weight: bold; }
+    .small { color: #555; font-size: 0.9rem; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Klokketest</h1>
+
+    <div id="ageStep">
+      <p><strong>I denne testen skal klokkeslettet på en analog klokke identifiseres.</strong></p>
+      <p>Svaret skal skrives på formatet 07:25. Klokken bruker 12-timerssystem, altså vil klokkeslettene kun være mellom 00 og 12.</p>
+      <p>Det vil bli vist tre klokker. Etter at klokkeslettet er skrevet inn, trykk «Sjekk svar». Dersom svaret er feil, kan et nytt forsøk gjøres. Ved riktig svar går testen videre til neste klokke.</p>
+      
+      <p>På forhånd, tusen takk for deltakelsen.</p>
+      <p>Skriv inn alder for å starte.</p>
+      <input id="ageInput" type="number" min="1" max="120" placeholder="Alder" />
+      <button id="startBtn">Start</button>
+    </div>
+
+    <div id="testStep" class="hidden">
+      <div class="timer">Tid: <span id="timer">0.0</span> sek</div>
+      <div id="progress" class="progress">Klokke 1 av 3</div>
+      <div class="clock" aria-label="Analog klokke">
+        <div class="tick" style="transform: rotate(0deg) translateY(0);"></div>
+        <div class="tick" style="transform: rotate(30deg) translateY(0);"></div>
+        <div class="tick" style="transform: rotate(60deg) translateY(0);"></div>
+        <div class="tick" style="transform: rotate(90deg) translateY(0);"></div>
+        <div class="tick" style="transform: rotate(120deg) translateY(0);"></div>
+        <div class="tick" style="transform: rotate(150deg) translateY(0);"></div>
+        <div class="tick" style="transform: rotate(180deg) translateY(0);"></div>
+        <div class="tick" style="transform: rotate(210deg) translateY(0);"></div>
+        <div class="tick" style="transform: rotate(240deg) translateY(0);"></div>
+        <div class="tick" style="transform: rotate(270deg) translateY(0);"></div>
+        <div class="tick" style="transform: rotate(300deg) translateY(0);"></div>
+        <div class="tick" style="transform: rotate(330deg) translateY(0);"></div>
+        <div id="hourHand" class="hand hour"></div>
+        <div id="minuteHand" class="hand minute"></div>
+        <div class="center"></div>
+      </div>
+
+      <input id="timeInput" type="text" placeholder="Skriv klokkeslettet" />
+      <button id="checkBtn">Sjekk svar</button>
+      <div id="message" class="msg"></div>
+      <div class="small">Resultatet lagres automatisk i et delt regneark som bare dere har tilgang til.</div>
+    </div>
+  </div>
+
+  <script>
+    const ageStep = document.getElementById('ageStep');
+    const testStep = document.getElementById('testStep');
+    const ageInput = document.getElementById('ageInput');
+    const timeInput = document.getElementById('timeInput');
+    const timerEl = document.getElementById('timer');
+    const messageEl = document.getElementById('message');
+    const progressEl = document.getElementById('progress');
+    const hourHand = document.getElementById('hourHand');
+    const minuteHand = document.getElementById('minuteHand');
+    const checkBtn = document.getElementById('checkBtn');
+
+    const clockTimes = ['06:30', '08:20', '05:35'];
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyN6x4-sIghCTnpWaRrCZIzy6yaJereCkl0yWfk1vWeBHDCEfo7E4dERN1lWJiEjzDdPQ/exec';
+
+    let currentClockIndex = 0;
+    let startTime = null;
+    let timerInterval = null;
+    let finalSeconds = null;
+
+    function normalizeTime(value) {
+      return value.trim().replace('.', ':');
+    }
+
+    function setClock(timeString) {
+      const [hours, minutes] = timeString.split(':').map(Number);
+      const minuteAngle = minutes * 6;
+      const hourAngle = (hours % 12) * 30 + minutes * 0.5;
+
+      minuteHand.style.transform = `translateX(-50%) rotate(${minuteAngle}deg)`;
+      hourHand.style.transform = `translateX(-50%) rotate(${hourAngle}deg)`;
+    }
+
+    function updateProgress() {
+      progressEl.textContent = `Klokke ${currentClockIndex + 1} av ${clockTimes.length}`;
+    }
+
+    function startTimer() {
+      startTime = Date.now();
+      timerInterval = setInterval(() => {
+        const seconds = (Date.now() - startTime) / 1000;
+        timerEl.textContent = seconds.toFixed(1);
+      }, 100);
+    }
+
+    function stopTimer() {
+      clearInterval(timerInterval);
+      finalSeconds = ((Date.now() - startTime) / 1000).toFixed(1);
+      timerEl.textContent = finalSeconds;
+    }
+
+    function saveResult(age, seconds) {
+      return new Promise((resolve, reject) => {
+        const iframeName = 'hidden_iframe_' + Date.now();
+        const iframe = document.createElement('iframe');
+        iframe.name = iframeName;
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = GAS_URL;
+        form.target = iframeName;
+        form.style.display = 'none';
+
+        const fields = {
+          age: age,
+          totalSeconds: seconds,
+          clock1: clockTimes[0],
+          clock2: clockTimes[1],
+          clock3: clockTimes[2],
+          submittedAt: new Date().toISOString()
+        };
+
+        Object.entries(fields).forEach(([key, value]) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = value;
+          form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+
+        let finished = false;
+
+        const cleanup = () => {
+          setTimeout(() => {
+            form.remove();
+            iframe.remove();
+          }, 1000);
+        };
+
+        iframe.onload = () => {
+          if (finished) return;
+          finished = true;
+          cleanup();
+          resolve(true);
+        };
+
+        setTimeout(() => {
+          if (finished) return;
+          finished = true;
+          cleanup();
+          resolve(true);
+        }, 3000);
+
+        try {
+          form.submit();
+        } catch (error) {
+          cleanup();
+          reject(error);
+        }
+      });
+    }
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+      const age = ageInput.value.trim();
+      if (!age) {
+        alert('Skriv inn alder først.');
+        return;
+      }
+
+      ageStep.classList.add('hidden');
+      testStep.classList.remove('hidden');
+      currentClockIndex = 0;
+      updateProgress();
+      setClock(clockTimes[currentClockIndex]);
+      startTimer();
+    });
+
+    checkBtn.addEventListener('click', async () => {
+      const answer = normalizeTime(timeInput.value);
+      const correctAnswer = clockTimes[currentClockIndex];
+
+      if (answer === correctAnswer || answer === correctAnswer.replace(/^0/, '')) {
+        messageEl.textContent = 'Riktig.';
+        timeInput.value = '';
+
+        if (currentClockIndex < clockTimes.length - 1) {
+          currentClockIndex += 1;
+          updateProgress();
+          setClock(clockTimes[currentClockIndex]);
+        } else {
+          stopTimer();
+          checkBtn.disabled = true;
+          timeInput.disabled = true;
+          messageEl.textContent = 'Lagrer resultat...';
+
+          try {
+            await saveResult(ageInput.value.trim(), finalSeconds);
+            messageEl.textContent = `Alle tre riktige. Tiden ble ${finalSeconds} sekunder. Resultatet er sendt.`;
+          } catch (error) {
+            messageEl.textContent = `Alle tre riktige. Tiden ble ${finalSeconds} sekunder, men lagring feilet.`;
+            console.error(error);
+          }
+        }
+      } else {
+        messageEl.textContent = 'Feil klokkeslett. Prøv igjen.';
+      }
+    });
+  </script>
+</body>
+</html>
